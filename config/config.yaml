@@ -1,5 +1,5 @@
 # Имя анализируемого npm-пакета
-package_name: "lodash"
+package_name: "express"
 
 # URL репозитория или путь к тестовому репозиторию
 repository: "https://registry.npmjs.org"
@@ -8,7 +8,7 @@ repository: "https://registry.npmjs.org"
 test_mode: false
 
 # Версия анализируемого пакета
-version: "4.17.21"
+version: "4.21.2"
 
 # Имя выходного файла с изображением графа
 output_file: "dependency_graph.png"

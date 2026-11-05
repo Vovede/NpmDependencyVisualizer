@@ -1,8 +1,7 @@
-
 import argparse
-from pathlib import Path
 
 from visualizer.config import load_config, ConfigError
+from visualizer.dependencies import get_direct_dependencies, DependencyError
 
 
 def main():
@@ -30,8 +29,28 @@ def main():
         print("-" * 40)
         print("Конфигурация успешно загружена.")
 
-    except ConfigError as error:
-        print(f"Ошибка конфигурации: {error}")
+        # Получаем прямые зависимости пакета
+        print("\nПолучение прямых зависимостей...")
+
+        dependencies = get_direct_dependencies(
+            config["package_name"],
+            config["version"],
+            config["repository"]
+        )
+
+        print("\nПрямые зависимости:")
+        print("-" * 40)
+
+        if dependencies:
+            for name, version in dependencies.items():
+                print(f"{name}: {version}")
+        else:
+            print("У пакета нет прямых зависимостей.")
+
+        print("-" * 40)
+
+    except (ConfigError, DependencyError) as error:
+        print(f"Ошибка: {error}")
         raise SystemExit(1)
 
 
