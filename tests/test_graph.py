@@ -1,6 +1,6 @@
 import pytest
 
-from visualizer.graph import build_dependency_graph
+from visualizer.graph import build_dependency_graph, DependencyGraph, get_loading_order
 
 
 @pytest.fixture
@@ -142,3 +142,39 @@ def test_filter_substring_e(test_dependencies):
     }
 
     assert graph.cycles == []
+
+def test_get_loading_order():
+    """Проверка порядка загрузки для графа без циклов."""
+
+    graph = DependencyGraph()
+    graph.graph = {
+        "A": ["B", "C"],
+        "B": ["D"],
+        "C": ["E"],
+        "D": [],
+        "E": []
+    }
+
+    loading_order, cycles = get_loading_order(graph)
+
+    assert cycles == []
+    assert loading_order.index("D") < loading_order.index("B")
+    assert loading_order.index("E") < loading_order.index("C")
+    assert loading_order.index("B") < loading_order.index("A")
+    assert loading_order.index("C") < loading_order.index("A")
+
+
+def test_get_loading_order_with_cycle():
+    """Проверка обнаружения цикла при определении порядка загрузки."""
+
+    graph = DependencyGraph()
+    graph.graph = {
+        "A": ["B"],
+        "B": ["D"],
+        "D": ["A"]
+    }
+
+    loading_order, cycles = get_loading_order(graph)
+
+    assert set(loading_order) == {"A", "B", "D"}
+    assert ["A", "B", "D", "A"] in cycles

@@ -132,3 +132,42 @@ def build_dependency_graph(
         find_cycles(package_name)
 
     return result
+
+def get_loading_order(graph):
+    """
+    Определяет порядок загрузки пакетов.
+    Зависимости располагаются раньше пакетов,
+    которые от них зависят.
+    """
+
+    loading_order = []
+    visited = set()
+    recursion_stack = []
+    cycles = []
+
+    def dfs(package):
+        if package in recursion_stack:
+            cycle = recursion_stack[recursion_stack.index(package):] + [package]
+
+            if cycle not in cycles:
+                cycles.append(cycle)
+
+            return
+
+        if package in visited:
+            return
+
+        visited.add(package)
+        recursion_stack.append(package)
+
+        for dependency in graph.graph.get(package, []):
+            if dependency in graph.graph:
+                dfs(dependency)
+
+        recursion_stack.pop()
+        loading_order.append(package)
+
+    for package in graph.graph:
+        dfs(package)
+
+    return loading_order, cycles

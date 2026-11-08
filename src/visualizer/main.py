@@ -2,7 +2,7 @@ import argparse
 
 from visualizer.config import load_config, ConfigError
 from visualizer.dependencies import get_dependencies, DependencyError
-from visualizer.graph import build_dependency_graph
+from visualizer.graph import build_dependency_graph, get_loading_order
 
 
 def main():
@@ -16,10 +16,18 @@ def main():
         help="Путь к YAML-файлу конфигурации"
     )
 
+    parser.add_argument(
+        "--loading-order",
+        action="store_true",
+        help="Вывести порядок загрузки зависимостей"
+    )
+
     args = parser.parse_args()
 
     try:
         config = load_config(args.config)
+
+        loading_order_mode = args.loading_order
 
         print("\nПараметры конфигурации:")
         print("-" * 40)
@@ -93,6 +101,32 @@ def main():
             print("Циклические зависимости не обнаружены.")
 
         print("-" * 40)
+
+        # Выводим порядок загрузки зависимостей
+        if loading_order_mode:
+            print("\nПорядок загрузки зависимостей:")
+            print("-" * 40)
+
+            loading_order, loading_cycles = get_loading_order(graph)
+
+            if loading_cycles:
+                print("Обнаружены циклические зависимости:")
+                for cycle in loading_cycles:
+                    print(" -> ".join(cycle))
+
+                print(
+                    "\nНевозможно гарантировать корректный полный "
+                    "порядок загрузки из-за циклических зависимостей."
+                )
+
+                print("Порядок обхода графа (не является полным порядком загрузки):")
+            else:
+                print("Зависимости расположены раньше зависимых пакетов:")
+
+            for index, package in enumerate(loading_order, start=1):
+                print(f"{index}. {package}")
+
+            print("-" * 40)
 
     except (ConfigError, DependencyError) as error:
         print(f"Ошибка: {error}")

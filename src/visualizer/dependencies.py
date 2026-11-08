@@ -3,6 +3,7 @@ import json
 
 from urllib.parse import quote
 from pathlib import Path
+from semantic_version import Version, NpmSpec
 
 
 class DependencyError(Exception):
@@ -11,34 +12,98 @@ class DependencyError(Exception):
 
 def get_direct_dependencies(package_name, version, repository):
     """
-    Получает прямые зависимости npm-пакета указанной версии.
+    Получает прямые зависимости npm-пакета.
+    Поддерживает точные версии и диапазоны версий.
     """
 
-    # Формируем URL запроса
     package = quote(package_name, safe="@")
-    package_version = quote(version, safe="")
 
-    url = f"{repository.rstrip('/')}/{package}/{package_version}"
-
+    # Проверяем, является ли версия точной
     try:
-        response = requests.get(url, timeout=10)
+        exact_version = Version(version)
+    except ValueError:
+        exact_version = None
 
-        # Проверяем HTTP-статус ответа
-        response.raise_for_status()
+    # Если версия точная, запрашиваем конкретную запись
+    if exact_version is not None:
+        url = (
+            f"{repository.rstrip('/')}/"
+            f"{package}/{quote(version, safe='')}"
+        )
 
-    except requests.exceptions.RequestException as error:
-        raise DependencyError(
-            f"Не удалось получить информацию о пакете: {error}"
-        ) from error
+        try:
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            package_data = response.json()
 
-    try:
-        package_data = response.json()
-    except ValueError as error:
-        raise DependencyError(
-            "Сервер вернул некорректный JSON."
-        ) from error
+        except requests.exceptions.RequestException as error:
+            raise DependencyError(
+                f"Не удалось получить информацию о пакете: {error}"
+            ) from error
 
-    # Извлекаем прямые зависимости
+        except ValueError as error:
+            raise DependencyError(
+                "Сервер вернул некорректный JSON."
+            ) from error
+
+    else:
+        # Для диапазона получаем метаданные всех версий пакета
+        url = f"{repository.rstrip('/')}/{package}"
+
+        try:
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            package_data = response.json()
+
+        except requests.exceptions.RequestException as error:
+            raise DependencyError(
+                f"Не удалось получить информацию о пакете: {error}"
+            ) from error
+
+        except ValueError as error:
+            raise DependencyError(
+                "Сервер вернул некорректный JSON."
+            ) from error
+
+        # Проверяем диапазон версий
+        try:
+            version_spec = NpmSpec(version)
+        except ValueError as error:
+            raise DependencyError(
+                f"Некорректный диапазон версий: {version}"
+            ) from error
+
+        versions = package_data.get("versions", {})
+
+        if not isinstance(versions, dict):
+            raise DependencyError(
+                "Некорректный формат списка версий пакета."
+            )
+
+        # Находим версии, удовлетворяющие диапазону
+        matching_versions = []
+
+        for version_string in versions:
+            try:
+                candidate = Version(version_string)
+
+                if version_spec.match(candidate):
+                    matching_versions.append(candidate)
+
+            except ValueError:
+                continue
+
+        if not matching_versions:
+            raise DependencyError(
+                f"Не найдена версия пакета {package_name}, "
+                f"удовлетворяющая диапазону {version}."
+            )
+
+        # Выбираем наиболее новую подходящую версию
+        selected_version = str(max(matching_versions))
+
+        package_data = versions[selected_version]
+
     dependencies = package_data.get("dependencies", {})
 
     if not isinstance(dependencies, dict):
