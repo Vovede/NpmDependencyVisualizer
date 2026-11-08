@@ -3,6 +3,7 @@ import requests
 from unittest.mock import Mock
 
 from visualizer.dependencies import (
+    get_test_dependencies,
     get_direct_dependencies,
     DependencyError
 )
@@ -113,3 +114,71 @@ def test_invalid_dependencies_format(monkeypatch):
             "4.21.2",
             "https://registry.npmjs.org"
         )
+
+
+def test_get_test_dependencies_success(tmp_path):
+    repository = tmp_path / "repository.json"
+
+    repository.write_text(
+        """
+        {
+            "A": {
+                "version": "1.0",
+                "dependencies": {
+                    "B": "1.0",
+                    "C": "1.0"
+                }
+            }
+        }
+        """,
+        encoding="utf-8"
+    )
+
+    result = get_test_dependencies("A", "1.0", str(repository))
+
+    assert result == {
+        "B": "1.0",
+        "C": "1.0"
+    }
+
+
+def test_test_repository_package_not_found(tmp_path):
+    repository = tmp_path / "repository.json"
+    repository.write_text("{}", encoding="utf-8")
+
+    with pytest.raises(DependencyError, match="отсутствует"):
+        get_test_dependencies("A", "1.0", str(repository))
+
+
+def test_test_repository_version_not_found(tmp_path):
+    repository = tmp_path / "repository.json"
+
+    repository.write_text(
+        """
+        {
+            "A": {
+                "version": "2.0",
+                "dependencies": {}
+            }
+        }
+        """,
+        encoding="utf-8"
+    )
+
+    with pytest.raises(DependencyError, match="Версия пакета"):
+        get_test_dependencies("A", "1.0", str(repository))
+
+
+def test_test_repository_file_not_found(tmp_path):
+    repository = tmp_path / "missing.json"
+
+    with pytest.raises(DependencyError, match="не найден"):
+        get_test_dependencies("A", "1.0", str(repository))
+
+
+def test_test_repository_invalid_json(tmp_path):
+    repository = tmp_path / "repository.json"
+    repository.write_text("{invalid json}", encoding="utf-8")
+
+    with pytest.raises(DependencyError, match="Не удалось прочитать"):
+        get_test_dependencies("A", "1.0", str(repository))

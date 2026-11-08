@@ -1,20 +1,7 @@
-# Имя анализируемого npm-пакета
-package_name: "express"
-
-# URL репозитория или путь к тестовому репозиторию
-repository: "https://registry.npmjs.org"
-
-# Режим работы с тестовым репозиторием
-test_mode: false
-
-# Версия анализируемого пакета
-version: "4.21.2"
-
-# Имя выходного файла с изображением графа
+package_name: "A"
+repository: "data/test_repository.json"
+test_mode: true
+version: "1.0"
 output_file: "dependency_graph.png"
-
-# Максимальная глубина анализа зависимостей
 max_depth: 3
-
-# Подстрока для фильтрации пакетов
 filter_substring: ""
