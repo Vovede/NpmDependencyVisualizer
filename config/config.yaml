@@ -2,6 +2,6 @@ package_name: "A"
 repository: "data/test_repository.json"
 test_mode: true
 version: "1.0"
-output_file: "dependency_graph.png"
+output_file: "test_repository_dependency_graph.png"
 max_depth: 3
 filter_substring: ""

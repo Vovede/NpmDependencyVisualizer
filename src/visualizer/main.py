@@ -1,8 +1,10 @@
 import argparse
+import subprocess
 
 from visualizer.config import load_config, ConfigError
 from visualizer.dependencies import get_dependencies, DependencyError
-from visualizer.graph import build_dependency_graph, get_loading_order
+from visualizer.graph import build_dependency_graph, get_loading_order, export_to_d2
+from pathlib import Path
 
 
 def main():
@@ -82,6 +84,30 @@ def main():
             max_depth=config["max_depth"],
             filter_substring=config["filter_substring"]
         )
+
+        # Создаём папку для результатов, если её нет
+        output_dir = Path("output")
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Экспортируем граф в формат D2
+        d2_file = output_dir / f"{Path(config['output_file']).stem}.d2"
+        export_to_d2(graph, d2_file)
+
+        print(f"D2-файл успешно создан: {d2_file}")
+
+        # Создаём PNG-изображение с помощью D2
+        png_file = output_dir / config["output_file"]
+
+        subprocess.run(
+            [
+                r"C:\Program Files\D2\d2.exe",
+                str(d2_file),
+                str(png_file)
+            ],
+            check=True
+        )
+
+        print(f"PNG-диаграмма успешно создана: {png_file}")
 
         print("\nГраф зависимостей:")
         print("-" * 40)

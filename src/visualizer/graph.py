@@ -171,3 +171,17 @@ def get_loading_order(graph):
         dfs(package)
 
     return loading_order, cycles
+
+
+def export_to_d2(graph, output_file):
+    """
+    Экспортирует граф зависимостей в формат D2.
+    """
+    with open(output_file, "w", encoding="utf-8") as file:
+        for package, dependencies in graph.graph.items():
+            for dependency in dependencies:
+                file.write(f'"{package}" -> "{dependency}"\n')
+
+            # Изолированные вершины тоже должны отображаться
+            if not dependencies:
+                file.write(f'"{package}"\n')
