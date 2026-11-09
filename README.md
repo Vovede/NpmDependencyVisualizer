@@ -51,19 +51,19 @@ $env:PYTHONPATH="src"
 Запуск по умолчанию:
 
 ```powershell
-python -m visualizer.main
+.\run.bat
 ```
 
 Запуск с конфигурацией (параметр `--config`):
 
 ```powershell
-python -m visualizer.main --config <путь к файлу конфигурации>
+.\run.bat --config <путь к файлу конфигурации>
 ```
 
 Запуск с выводом порядка загрузки зависимостей (параметр `--loading-order`)
 
 ```powershell
-python -m visualizer.main --loading-order
+.\run.bat --loading-order
 ```
 
 Результаты визуализации сохраняются в папке `output`.
