@@ -1,6 +1,8 @@
 import pytest
 
-from visualizer.graph import build_dependency_graph, DependencyGraph, get_loading_order
+from visualizer.graph import (build_dependency_graph,
+                              DependencyGraph,
+                              get_loading_order)
 
 
 @pytest.fixture

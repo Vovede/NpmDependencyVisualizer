@@ -2,7 +2,9 @@ import pytest
 import requests
 from unittest.mock import Mock
 
-from visualizer.dependencies import get_test_dependencies, get_direct_dependencies, DependencyError
+from visualizer.dependencies import (get_test_dependencies,
+                                     get_direct_dependencies,
+                                     DependencyError)
 
 
 def test_get_direct_dependencies_success(monkeypatch):

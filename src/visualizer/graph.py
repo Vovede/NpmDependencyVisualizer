@@ -2,11 +2,96 @@ class DependencyGraph:
     """Граф зависимостей npm-пакетов."""
 
     def __init__(self):
-        # Список смежности: пакет -> его зависимости
         self.graph = {}
-
-        # Обнаруженные циклы
         self.cycles = []
+
+
+def find_cycle(package, stack):
+    if package not in stack:
+        return None
+
+    start = stack.index(package)
+    return stack[start:] + [package]
+
+
+def record_cycle(cycles, cycle):
+    if cycle and cycle not in cycles:
+        cycles.append(cycle)
+
+
+def filter_graph(graph, root, substring):
+    filtered = {}
+
+    for package, dependencies in graph.items():
+        if package == root:
+            filtered[package] = [
+                dep for dep in dependencies
+                if substring.lower() in dep.lower()
+            ]
+        elif substring.lower() in package.lower():
+            filtered[package] = dependencies.copy()
+
+    return filtered
+
+
+def find_graph_cycles(graph, root):
+    cycles = []
+    visited = set()
+    stack = []
+
+    def dfs(package):
+        visited.add(package)
+        stack.append(package)
+
+        for dependency in graph.get(package, []):
+            cycle = find_cycle(dependency, stack)
+            if cycle:
+                record_cycle(cycles, cycle)
+            elif dependency in graph and dependency not in visited:
+                dfs(dependency)
+
+        stack.pop()
+
+    dfs(root)
+    return cycles
+
+
+def _build_graph(package_name, version, dependency_loader, max_depth):
+    result = DependencyGraph()
+    visited = set()
+    recursion_stack = []
+
+    def dfs(current_package, current_version, depth):
+        if current_package in visited:
+            return
+
+        visited.add(current_package)
+        recursion_stack.append(current_package)
+        result.graph.setdefault(current_package, [])
+
+        if depth < max_depth:
+            dependencies = dependency_loader(
+                current_package, current_version
+            )
+
+            for dependency, dep_version in dependencies.items():
+                result.graph[current_package].append(dependency)
+
+                cycle = find_cycle(dependency, recursion_stack)
+                if cycle:
+                    record_cycle(result.cycles, cycle)
+                    continue
+
+                if dependency not in visited:
+                    dfs(dependency, dep_version, depth + 1)
+                else:
+                    result.graph.setdefault(dependency, [])
+
+        recursion_stack.pop()
+
+    dfs(package_name, version, 0)
+    return result
+
 
 
 def build_dependency_graph(
@@ -20,118 +105,21 @@ def build_dependency_graph(
     Строит граф транзитивных зависимостей
     с помощью рекурсивного обхода DFS.
     """
+    result = _build_graph(
+        package_name, version, dependency_loader, max_depth
+    )
 
-    result = DependencyGraph()
-
-    # Посещённые вершины
-    visited = set()
-
-    # Вершины, находящиеся в текущем пути обхода
-    recursion_stack = []
-
-    def dfs(current_package, current_version, depth):
-        # Не обходим уже посещённые пакеты повторно
-        if current_package in visited:
-            return
-
-        visited.add(current_package)
-        recursion_stack.append(current_package)
-
-        # Добавляем вершину в граф
-        result.graph.setdefault(current_package, [])
-
-        # Если достигнута максимальная глубина,
-        # не загружаем зависимости этого пакета
-        if depth < max_depth:
-            # Получаем прямые зависимости текущего пакета
-            dependencies = dependency_loader(current_package, current_version)
-
-            for dependency, dependency_version in dependencies.items():
-
-                # Добавляем ребро графа
-                result.graph[current_package].append(dependency)
-
-                # Проверяем циклическую зависимость
-                if dependency in recursion_stack:
-                    cycle = recursion_stack[
-                                recursion_stack.index(dependency):
-                            ] + [dependency]
-
-                    if cycle not in result.cycles:
-                        result.cycles.append(cycle)
-
-                    continue
-
-                # Если пакет ещё не посещался, запускаем DFS
-                if dependency not in visited:
-                    dfs(
-                        dependency,
-                        dependency_version,
-                        depth + 1
-                    )
-
-                else:
-                    result.graph.setdefault(dependency, [])
-
-        recursion_stack.pop()
-
-    dfs(package_name, version, 0)
-
-    # Фильтрация вершин по подстроке
     if filter_substring:
-        filtered_graph = {}
-
-        for package, dependencies in result.graph.items():
-
-            # Корневой пакет всегда сохраняется,
-            # но его зависимости фильтруются
-            if package == package_name:
-                filtered_graph[package] = [
-                    dependency
-                    for dependency in dependencies
-                    if filter_substring.lower() in dependency.lower()
-                ]
-
-            # Остальные пакеты сохраняются,
-            # если содержат искомую подстроку
-            elif filter_substring.lower() in package.lower():
-                filtered_graph[package] = dependencies.copy()
-
-        result.graph = filtered_graph
-
-        # Пересчитываем циклы для отфильтрованного графа
-        result.cycles = []
-
-        visited = set()
-        recursion_stack = []
-
-        def find_cycles(current_package):
-            if current_package not in result.graph:
-                return
-
-            visited.add(current_package)
-            recursion_stack.append(current_package)
-
-            for dependency in result.graph[current_package]:
-                if dependency in recursion_stack:
-                    cycle = recursion_stack[
-                                recursion_stack.index(dependency):
-                            ] + [dependency]
-
-                    if cycle not in result.cycles:
-                        result.cycles.append(cycle)
-
-                elif (
-                        dependency in result.graph
-                        and dependency not in visited
-                ):
-                    find_cycles(dependency)
-
-            recursion_stack.pop()
-
-        find_cycles(package_name)
+        result.graph = filter_graph(
+            result.graph, package_name, filter_substring
+        )
+        result.cycles = find_graph_cycles(
+            result.graph, package_name
+        )
 
     return result
+
+
 
 def get_loading_order(graph):
     """
@@ -139,19 +127,15 @@ def get_loading_order(graph):
     Зависимости располагаются раньше пакетов,
     которые от них зависят.
     """
-
     loading_order = []
     visited = set()
     recursion_stack = []
     cycles = []
 
     def dfs(package):
-        if package in recursion_stack:
-            cycle = recursion_stack[recursion_stack.index(package):] + [package]
-
-            if cycle not in cycles:
-                cycles.append(cycle)
-
+        cycle = find_cycle(package, recursion_stack)
+        if cycle:
+            record_cycle(cycles, cycle)
             return
 
         if package in visited:
@@ -179,9 +163,10 @@ def export_to_d2(graph, output_file):
     """
     with open(output_file, "w", encoding="utf-8") as file:
         for package, dependencies in graph.graph.items():
-            for dependency in dependencies:
-                file.write(f'"{package}" -> "{dependency}"\n')
-
-            # Изолированные вершины тоже должны отображаться
-            if not dependencies:
+            if dependencies:
+                for dependency in dependencies:
+                    file.write(
+                        f'"{package}" -> "{dependency}"\n'
+                    )
+            else:
                 file.write(f'"{package}"\n')
